@@ -1096,10 +1096,138 @@ const ENERGY_MOBILE_MAP_LAYERS: MapLayers = {
 };
 
 // ============================================
+// SEMI variant — semi.worldmonitor.app
+// Fabs, packaging, critical materials, export controls, chip logistics.
+// Wired for the web deploy the same way as the other subdomain variants
+// (WEB_DASHBOARD_VARIANTS + vercel.json host rewrite + middleware VARIANT_OG);
+// the DNS record / Vercel domain assignment is the only step that lives
+// outside this repo. See docs/semiconductor-variant.mdx.
+//
+// Panel keys are reused from the tech/commodity/full sets wherever an
+// equivalent surface already exists — only the four chip-specific news
+// categories below are new, and those resolve through the generic
+// CANONICAL_FEEDS loop in panel-layout.ts (label comes from PanelConfig.name,
+// so no new i18n keys are required).
+// ============================================
+const SEMI_PANELS: Record<string, PanelConfig> = {
+  // Core
+  map: { name: 'Semiconductor & Supply Chain Map', enabled: true, priority: 1 },
+  'live-news': { name: 'Chip Industry Headlines', enabled: true, priority: 1 },
+  insights: { name: 'AI Supply Chain Insights', enabled: true, priority: 1 },
+  // Chip-specific news categories (new — defined in SEMI_FEEDS)
+  semiconductors: { name: 'Semiconductor News', enabled: true, priority: 1 },
+  'fab-capex': { name: 'Fabs & Capex', enabled: true, priority: 1 },
+  'export-controls': { name: 'Export Controls & Chip Policy', enabled: true, priority: 1 },
+  'chip-materials': { name: 'Materials, Substrates & HBM', enabled: true, priority: 1 },
+  // Adjacent news reused from the tech / commodity presets. These are not in
+  // SEMI_FEEDS, so feed-resolution treats them as user-custom categories and
+  // loads them client-side from CANONICAL_FEEDS.
+  hardware: { name: 'Hardware & Devices', enabled: true, priority: 2 },
+  ai: { name: 'AI & Compute Demand', enabled: true, priority: 2 },
+  'critical-minerals': { name: 'Critical Minerals', enabled: true, priority: 2 },
+  security: { name: 'Cyber & OT Security', enabled: true, priority: 2 },
+  policy: { name: 'Tech Policy', enabled: true, priority: 2 },
+  layoffs: { name: 'Layoffs & Restructuring', enabled: true, priority: 3 },
+  // Supply-chain / trade data surfaces
+  'supply-chain': { name: 'Supply Chain & Logistics', enabled: true, priority: 1 },
+  'trade-policy': { name: 'Trade Policy', enabled: true, priority: 1 },
+  'global-procurement': { name: 'Global Procurement', enabled: true, priority: 2 },
+  'sanctions-pressure': { name: 'Sanctions Pressure', enabled: true, priority: 2 },
+  // Markets context
+  markets: { name: 'Chip & Equipment Markets', enabled: true, priority: 1 },
+  commodities: { name: 'Materials & Commodities', enabled: true, priority: 2 },
+  heatmap: { name: 'Sector Heatmap', enabled: true, priority: 2 },
+  'macro-signals': { name: 'Market Radar', enabled: true, priority: 2 },
+  economic: { name: 'Macro Stress', enabled: true, priority: 2 },
+  polymarket: { name: 'Tech & Trade Predictions', enabled: true, priority: 3 },
+  // Tracking
+  monitors: { name: 'My Monitors', enabled: true, priority: 3 },
+  'world-clock': { name: 'World Clock', enabled: true, priority: 3 },
+  'latest-brief': { name: 'Latest Brief', enabled: true, priority: 1, premium: 'locked' as const },
+};
+
+// Default-on layers must all appear in VARIANT_LAYER_ORDER.semi
+// (tests/variant-layer-guardrail.test.mjs), otherwise they render with no
+// toggle to turn them off.
+const SEMI_MAP_LAYERS: MapLayers = {
+  // ── Fab / compute footprint ───────────────────────────────────────────────
+  datacenters: true,       // AI compute demand behind leading-edge orders
+  cloudRegions: true,      // hyperscaler capacity
+  techHQs: true,           // fab & equipment vendor HQs
+  cables: true,            // subsea capacity serving the same corridors
+  // ── Materials & logistics ─────────────────────────────────────────────────
+  minerals: true,          // gallium, germanium, rare earths, silicon
+  commodityPorts: true,    // wafer / equipment / substrate gateways
+  tradeRoutes: true,
+  waterways: true,         // Taiwan Strait, Malacca, Suez
+  miningSites: false,      // available in the picker, off by default
+  processingPlants: false,
+  ais: false,
+  // ── Policy & risk context ─────────────────────────────────────────────────
+  sanctions: true,         // export controls / entity-list pressure
+  economic: true,
+  outages: true,           // power & grid risk to fabs
+  natural: true,           // earthquake exposure (Taiwan, Japan, Korea)
+  weather: false,
+  fires: false,
+  climate: false,
+  cyberThreats: false,
+  resilienceScore: false,
+  dayNight: false,
+  // ── Not applicable ────────────────────────────────────────────────────────
+  gpsJamming: false,
+  satellites: false,
+  conflicts: false,
+  bases: false,
+  pipelines: false,
+  hotspots: false,
+  nuclear: false,
+  irradiators: false,
+  protests: false,
+  flights: false,
+  military: false,
+  spaceports: false,
+  ucdpEvents: false,
+  displacement: false,
+  startupHubs: false,
+  accelerators: false,
+  techEvents: false,
+  stockExchanges: false,
+  financialCenters: false,
+  centralBanks: false,
+  commodityHubs: false,
+  gulfInvestments: false,
+  positiveEvents: false,
+  kindness: false,
+  happiness: false,
+  speciesRecovery: false,
+  renewableInstallations: false,
+  iranAttacks: false,
+  ciiChoropleth: false,
+  webcams: false,
+  diseaseOutbreaks: false,
+  storageFacilities: false,
+  fuelShortages: false,
+  liveTankers: false,
+};
+
+const SEMI_MOBILE_MAP_LAYERS: MapLayers = {
+  ...SEMI_MAP_LAYERS,
+  // Mobile keeps only the fab/materials core — everything else off for perf.
+  cables: false,
+  cloudRegions: false,
+  tradeRoutes: false,
+  waterways: false,
+  sanctions: false,
+  economic: false,
+  outages: false,
+};
+
+// ============================================
 // UNIFIED PANEL REGISTRY
 // ============================================
 
-type PanelVariant = 'full' | 'tech' | 'finance' | 'commodity' | 'energy' | 'happy';
+type PanelVariant = 'full' | 'tech' | 'finance' | 'commodity' | 'energy' | 'semi' | 'happy';
 
 const VARIANT_PANEL_CONFIGS: Record<PanelVariant, Record<string, PanelConfig>> = {
   full: FULL_PANELS,
@@ -1107,6 +1235,7 @@ const VARIANT_PANEL_CONFIGS: Record<PanelVariant, Record<string, PanelConfig>> =
   finance: FINANCE_PANELS,
   commodity: COMMODITY_PANELS,
   energy: ENERGY_PANELS,
+  semi: SEMI_PANELS,
   happy: HAPPY_PANELS,
 };
 
@@ -1121,6 +1250,7 @@ export const ALL_PANELS: Record<string, PanelConfig> = {
   ...HAPPY_PANELS,
   ...COMMODITY_PANELS,
   ...ENERGY_PANELS,
+  ...SEMI_PANELS,
   ...TECH_PANELS,
   ...FINANCE_PANELS,
   ...FULL_PANELS,
@@ -1133,6 +1263,7 @@ export const VARIANT_DEFAULTS: Record<string, string[]> = {
   finance:   Object.keys(VARIANT_PANEL_CONFIGS.finance),
   commodity: Object.keys(VARIANT_PANEL_CONFIGS.commodity),
   energy:    Object.keys(VARIANT_PANEL_CONFIGS.energy),
+  semi:      Object.keys(VARIANT_PANEL_CONFIGS.semi),
   happy:     Object.keys(VARIANT_PANEL_CONFIGS.happy),
 };
 
@@ -1303,7 +1434,9 @@ export const DEFAULT_MAP_LAYERS = SITE_VARIANT === 'happy'
         ? COMMODITY_MAP_LAYERS
         : SITE_VARIANT === 'energy'
           ? ENERGY_MAP_LAYERS
-          : FULL_MAP_LAYERS;
+          : SITE_VARIANT === 'semi'
+            ? SEMI_MAP_LAYERS
+            : FULL_MAP_LAYERS;
 
 export const MOBILE_DEFAULT_MAP_LAYERS = SITE_VARIANT === 'happy'
   ? HAPPY_MOBILE_MAP_LAYERS
@@ -1315,7 +1448,9 @@ export const MOBILE_DEFAULT_MAP_LAYERS = SITE_VARIANT === 'happy'
         ? COMMODITY_MOBILE_MAP_LAYERS
         : SITE_VARIANT === 'energy'
           ? ENERGY_MOBILE_MAP_LAYERS
-          : FULL_MOBILE_MAP_LAYERS;
+          : SITE_VARIANT === 'semi'
+            ? SEMI_MOBILE_MAP_LAYERS
+            : FULL_MOBILE_MAP_LAYERS;
 
 /** Maps map-layer toggle keys to their data-freshness source IDs (single source of truth). */
 export const LAYER_TO_SOURCE: Partial<Record<keyof MapLayers, DataSourceId[]>> = {
@@ -1452,6 +1587,29 @@ export const PANEL_CATEGORY_MAP: Record<string, { labelKey: string; panelKeys: s
     labelKey: 'header.panelCatCommodityEcon',
     panelKeys: ['trade-policy', 'sanctions-pressure', 'economic', 'gulf-economies', 'gcc-investments', 'consumer-prices', 'finance', 'polymarket', 'airline-intel', 'world-clock', 'monitors'],
     variants: ['commodity'],
+  },
+
+  // Semi variant — labelKeys are reused from the tech/commodity blocks so the
+  // variant needs no new i18n entries across the 25 shipped locales.
+  semiIndustry: {
+    labelKey: 'header.panelCatTechAi',
+    panelKeys: ['semiconductors', 'fab-capex', 'chip-materials', 'hardware', 'ai', 'layoffs'],
+    variants: ['semi'],
+  },
+  semiSupplyChain: {
+    labelKey: 'header.panelCatCommodities',
+    panelKeys: ['supply-chain', 'critical-minerals', 'commodities', 'global-procurement'],
+    variants: ['semi'],
+  },
+  semiPolicy: {
+    labelKey: 'header.panelCatSecurityPolicy',
+    panelKeys: ['export-controls', 'trade-policy', 'sanctions-pressure', 'policy', 'security'],
+    variants: ['semi'],
+  },
+  semiMarkets: {
+    labelKey: 'header.panelCatMarkets',
+    panelKeys: ['markets', 'heatmap', 'macro-signals', 'economic', 'polymarket', 'monitors', 'world-clock'],
+    variants: ['semi'],
   },
 
   // Happy variant

@@ -530,10 +530,26 @@ export class MapComponent {
       'weather', 'fires',                     // operational risk
       'economic',                             // infrastructure context
     ];
+    // Semi variant — SVG/mobile fallback. Same rule as energyLayers above: only
+    // keys with a render path in this file. commodityPorts / miningSites /
+    // processingPlants / tradeRoutes / resilienceScore / dayNight are DeckGL-only,
+    // so they stay in VARIANT_LAYER_ORDER.semi but out of this toggle row.
+    const semiLayers: (keyof MapLayers)[] = [
+      'datacenters', 'cloudRegions', 'techHQs',  // fab / compute footprint
+      'cables',                                   // connectivity along the same corridors
+      'minerals',                                 // gallium, germanium, rare earths
+      'sanctions',                                // export controls / entity list
+      'outages',                                  // grid risk to fabs
+      'natural', 'weather',                       // earthquake / operating risk
+      'economic',                                 // economic context
+      'waterways',                                // Taiwan Strait, Malacca
+      'ais',                                      // component shipping
+    ];
     const layers = SITE_VARIANT === 'tech' ? techLayers
                  : SITE_VARIANT === 'finance' ? financeLayers
                  : SITE_VARIANT === 'happy' ? happyLayers
                  : SITE_VARIANT === 'energy' ? energyLayers
+                 : SITE_VARIANT === 'semi' ? semiLayers
                  : fullLayers;
     const MAX_SVG_LAYERS = 9;
     const enforceLayerLimit = () => {

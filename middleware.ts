@@ -64,6 +64,7 @@ const VARIANT_HOST_MAP: Record<string, string> = {
   'commodity.worldmonitor.app': 'commodity',
   'happy.worldmonitor.app': 'happy',
   'energy.worldmonitor.app': 'energy',
+  'semi.worldmonitor.app': 'semi',
 };
 
 // Source of truth: src/config/variant-meta.ts — keep in sync when variant metadata changes.
@@ -105,6 +106,13 @@ const VARIANT_OG: Record<string, { name: string; title: string; description: str
     description: 'Real-time global energy atlas tracking oil and gas pipelines, storage facilities, chokepoints, fuel shortages, tanker flows, and disruption events worldwide.',
     image: 'https://energy.worldmonitor.app/favico/energy/og-image.png',
     url: 'https://energy.worldmonitor.app/dashboard',
+  },
+  semi: {
+    name: 'Semi Monitor',
+    title: 'Semi Monitor - Semiconductor & Chip Supply Chain Dashboard',
+    description: 'Real-time semiconductor intelligence tracking fabs, capex, advanced packaging, critical chip materials, export controls, and chip supply-chain disruption worldwide.',
+    image: 'https://semi.worldmonitor.app/favico/semi/og-image.png',
+    url: 'https://semi.worldmonitor.app/dashboard',
   },
 };
 
@@ -212,6 +220,7 @@ export default function middleware(request: Request) {
 <li><a href="https://tech.worldmonitor.app/dashboard">Tech Monitor</a></li>
 <li><a href="https://finance.worldmonitor.app/dashboard">Finance Monitor</a></li>
 <li><a href="https://commodity.worldmonitor.app/dashboard">Commodity Monitor</a></li>
+<li><a href="https://semi.worldmonitor.app/dashboard">Semi Monitor</a></li>
 <li><a href="https://happy.worldmonitor.app/dashboard">Happy Monitor</a></li>
 <li><a href="https://www.worldmonitor.app/pro">World Monitor Pro</a></li>
 <li><a href="https://www.worldmonitor.app/blog/">Blog</a></li>

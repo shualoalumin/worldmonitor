@@ -150,4 +150,32 @@ export const VARIANT_META: { full: VariantMeta; [k: string]: VariantMeta } = {
       'Country energy exposure drill-down',
     ],
   },
+  // Build-time / self-host variant — no semi.worldmonitor.app deployment yet, so
+  // this entry is not consumed by renderVariantDashboardHtml (semi is absent from
+  // WEB_DASHBOARD_VARIANTS). It drives the VITE_VARIANT=semi build's index.html
+  // metas and stays here as the single source of truth if the variant is later
+  // promoted to its own subdomain.
+  semi: {
+    title: 'Semi Monitor - Semiconductor & Chip Supply Chain Dashboard',
+    description: 'Real-time semiconductor intelligence tracking fabs, capex, advanced packaging, critical chip materials, export controls, and chip supply-chain disruption worldwide.',
+    keywords: 'semiconductor dashboard, chip supply chain, fab tracker, wafer fab, TSMC, ASML, EUV lithography, advanced packaging, CoWoS, HBM, DRAM, NAND, chip export controls, entity list, CHIPS Act, gallium germanium, rare earths, chip shortage, foundry capacity, semiconductor capex, chip tariffs',
+    url: 'https://semi.worldmonitor.app/dashboard',
+    siteName: 'Semi Monitor',
+    shortName: 'SemiMonitor',
+    subject: 'Semiconductor Industry and Chip Supply Chain Intelligence',
+    classification: 'Semiconductor Dashboard, Supply Chain Tracker, Export Control Monitor',
+    categories: ['news', 'business'],
+    features: [
+      'Semiconductor news aggregation',
+      'Fab construction & capex tracking',
+      'Advanced packaging & HBM coverage',
+      'Export control & entity-list monitoring',
+      'Critical chip materials tracking',
+      'Chip supply-chain & logistics signals',
+      'Datacenter & cloud region mapping',
+      'Chip and equipment market data',
+      'Trade policy & sanctions pressure',
+      'Earthquake & grid risk to fab clusters',
+    ],
+  },
 };

@@ -858,6 +858,49 @@ const ENERGY_FEEDS: Record<string, Feed[]> = {
   ],
 };
 
+// Semi variant feeds — semiconductor & supply-chain intelligence.
+// Keys match the chip-specific panel IDs in src/config/panels.ts SEMI_PANELS.
+// The adjacent categories that variant reuses (hardware / ai / critical-minerals /
+// security / policy / layoffs) are deliberately NOT redefined here: they already
+// exist in TECH_FEEDS / COMMODITY_FEEDS / FULL_FEEDS, and re-declaring them would
+// union chip-scoped sources into those categories for every other variant via
+// mergeCanonicalFeeds. They resolve through the custom-category path instead
+// (see src/config/feed-resolution.ts).
+const SEMI_FEEDS: Record<string, Feed[]> = {
+  'live-news': [
+    { name: 'Reuters Semiconductors', url: rss('https://news.google.com/rss/search?q=site:reuters.com+(semiconductor+OR+chipmaker+OR+TSMC+OR+ASML+OR+Nvidia+OR+"chip+industry")+when:1d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'Bloomberg Chips', url: rss('https://news.google.com/rss/search?q=site:bloomberg.com+(semiconductor+OR+chip+OR+TSMC+OR+Samsung+foundry)+when:1d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'Nikkei Asia Tech', url: rss('https://news.google.com/rss/search?q=site:asia.nikkei.com+(semiconductor+OR+chip+OR+TSMC+OR+foundry)+when:2d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'DigiTimes', url: rss('https://news.google.com/rss/search?q=site:digitimes.com+(semiconductor+OR+foundry+OR+wafer+OR+packaging)+when:2d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'Tom’s Hardware', url: rss('https://www.tomshardware.com/feeds/all') },
+  ],
+  semiconductors: [
+    { name: 'AnandTech / Chip Design', url: rss('https://news.google.com/rss/search?q=("chip+design"+OR+"process+node"+OR+"2nm"+OR+"3nm"+OR+EUV+OR+"High-NA")+when:2d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'Foundry & Nodes', url: rss('https://news.google.com/rss/search?q=(TSMC+OR+"Samsung+Foundry"+OR+"Intel+Foundry"+OR+GlobalFoundries+OR+SMIC+OR+"Rapidus")+when:1d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'Memory & Storage', url: rss('https://news.google.com/rss/search?q=(DRAM+OR+NAND+OR+HBM+OR+"SK+Hynix"+OR+Micron+OR+"memory+prices")+when:1d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'Equipment Makers', url: rss('https://news.google.com/rss/search?q=(ASML+OR+"Applied+Materials"+OR+"Lam+Research"+OR+"Tokyo+Electron"+OR+KLA+OR+"lithography")+when:2d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'EE Times', url: rss('https://news.google.com/rss/search?q=site:eetimes.com+when:3d&hl=en-US&gl=US&ceid=US:en') },
+  ],
+  'fab-capex': [
+    { name: 'Fab Construction', url: rss('https://news.google.com/rss/search?q=("new+fab"+OR+"fab+construction"+OR+"chip+plant"+OR+"wafer+fab"+OR+"fab+expansion")+when:3d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'Capex & Guidance', url: rss('https://news.google.com/rss/search?q=("semiconductor+capex"+OR+"chip+capex"+OR+"capital+spending"+semiconductor)+when:3d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'Chip Subsidies', url: rss('https://news.google.com/rss/search?q=("CHIPS+Act"+OR+"chip+subsidy"+OR+"EU+Chips+Act"+OR+"semiconductor+grant"+OR+"fab+incentive")+when:3d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'Packaging & Test Capacity', url: rss('https://news.google.com/rss/search?q=("advanced+packaging"+OR+CoWoS+OR+"OSAT"+OR+"chip+packaging+capacity")+when:3d&hl=en-US&gl=US&ceid=US:en') },
+  ],
+  'export-controls': [
+    { name: 'Export Controls', url: rss('https://news.google.com/rss/search?q=("export+controls"+OR+"entity+list"+OR+"BIS+rule"+OR+"chip+export"+OR+"technology+transfer")+when:2d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'Chip Sanctions', url: rss('https://news.google.com/rss/search?q=("chip+sanctions"+OR+"semiconductor+sanctions"+OR+"chip+smuggling"+OR+"GPU+export")+when:2d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'Tariffs & Trade Rules', url: rss('https://news.google.com/rss/search?q=("semiconductor+tariff"+OR+"chip+tariff"+OR+"Section+232"+semiconductor+OR+"trade+rule"+chips)+when:3d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'Taiwan & Korea Policy', url: rss('https://news.google.com/rss/search?q=("Taiwan+chip"+OR+"Korea+chip+policy"+OR+"Japan+semiconductor+policy"+OR+"chip+alliance")+when:3d&hl=en-US&gl=US&ceid=US:en') },
+  ],
+  'chip-materials': [
+    { name: 'Wafers & Substrates', url: rss('https://news.google.com/rss/search?q=("silicon+wafer"+OR+"ABF+substrate"+OR+"IC+substrate"+OR+"photoresist"+OR+"wafer+supply")+when:3d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'Critical Chip Inputs', url: rss('https://news.google.com/rss/search?q=(gallium+OR+germanium+OR+"rare+earth"+OR+"neon+gas"+OR+"high-purity+quartz")+export+OR+supply+when:3d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'HBM & Advanced Memory', url: rss('https://news.google.com/rss/search?q=(HBM+OR+"HBM3E"+OR+"HBM4"+OR+"memory+supply+deal")+when:2d&hl=en-US&gl=US&ceid=US:en') },
+    { name: 'Chip Logistics', url: rss('https://news.google.com/rss/search?q=("chip+shortage"+OR+"semiconductor+supply+chain"+OR+"component+lead+time"+OR+"electronics+logistics")+when:2d&hl=en-US&gl=US&ceid=US:en') },
+  ],
+};
+
 // Variant-aware exports
 export const FEEDS = SITE_VARIANT === 'tech'
   ? TECH_FEEDS
@@ -869,7 +912,9 @@ export const FEEDS = SITE_VARIANT === 'tech'
         ? COMMODITY_FEEDS
         : SITE_VARIANT === 'energy'
           ? ENERGY_FEEDS
-          : FULL_FEEDS;
+          : SITE_VARIANT === 'semi'
+            ? SEMI_FEEDS
+            : FULL_FEEDS;
 
 // Canonical category→feeds map: the union of every variant's feed set.
 // `FEEDS` (above) is just the active variant's PRESET; users freely customize
@@ -884,6 +929,7 @@ export const CANONICAL_FEEDS: Record<string, Feed[]> = mergeCanonicalFeeds([
   FINANCE_FEEDS,
   COMMODITY_FEEDS,
   ENERGY_FEEDS,
+  SEMI_FEEDS,
   HAPPY_FEEDS,
 ]);
 
@@ -896,7 +942,7 @@ export const SOURCE_REGION_MAP: Record<string, { labelKey: string; feedKeys: str
   africa: { labelKey: 'header.sourceRegionAfrica', feedKeys: ['africa'] },
   latam: { labelKey: 'header.sourceRegionLatAm', feedKeys: ['latam'] },
   asia: { labelKey: 'header.sourceRegionAsiaPacific', feedKeys: ['asia'] },
-  topical: { labelKey: 'header.sourceRegionTopical', feedKeys: ['energy', 'tech', 'ai', 'finance', 'layoffs', 'thinktanks'] },
+  topical: { labelKey: 'header.sourceRegionTopical', feedKeys: ['energy', 'tech', 'ai', 'finance', 'layoffs', 'thinktanks', 'semiconductors', 'fab-capex', 'export-controls', 'chip-materials'] },
   intel: { labelKey: 'header.sourceRegionIntel', feedKeys: [] },
 
   // Tech variant regions

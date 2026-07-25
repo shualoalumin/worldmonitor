@@ -3,7 +3,7 @@ import type { MapLayers } from '@/types';
 import { isDesktopRuntime } from '@/services/runtime';
 
 export type MapRenderer = 'flat' | 'globe';
-export type MapVariant = 'full' | 'tech' | 'finance' | 'happy' | 'commodity' | 'energy';
+export type MapVariant = 'full' | 'tech' | 'finance' | 'happy' | 'commodity' | 'energy' | 'semi';
 
 const _desktop = isDesktopRuntime();
 
@@ -328,6 +328,16 @@ const VARIANT_LAYER_ORDER: Record<MapVariant, Array<keyof MapLayers>> = {
     'ais', 'liveTankers', 'tradeRoutes', 'minerals',
     // Energy-adjacent context
     'sanctions', 'fires', 'climate', 'weather', 'outages', 'natural',
+    'resilienceScore', 'dayNight',
+  ],
+  semi: [
+    // Fab / compute footprint — mirror of SEMI_MAP_LAYERS in panels.ts
+    'datacenters', 'cloudRegions', 'techHQs', 'cables',
+    // Materials & logistics
+    'minerals', 'miningSites', 'processingPlants', 'commodityPorts',
+    'tradeRoutes', 'waterways', 'ais',
+    // Policy & operating risk
+    'sanctions', 'economic', 'outages', 'natural', 'weather',
     'resilienceScore', 'dayNight',
   ],
 };
