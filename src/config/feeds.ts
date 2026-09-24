@@ -859,7 +859,17 @@ const ENERGY_FEEDS: Record<string, Feed[]> = {
 };
 
 // Semi variant feeds — semiconductor & supply-chain intelligence.
-// Keys match the chip-specific panel IDs in src/config/panels.ts SEMI_PANELS.
+// Keys match the chip-specific panel IDs in src/config/panels.ts SEMI_PANELS,
+// and are mirrored server-side in server/worldmonitor/news/v1/_feeds.ts under
+// `semi` (locked by tests/news-feed-key-parity.test.mts) so the digest serves
+// them instead of falling back to the full-variant buckets.
+//
+// `live-news` is the exception: panel-layout.ts skips that key when creating
+// generic NewsPanels because it belongs to the 24/7 video LiveNewsPanel, so
+// these feeds never render as a headlines panel. They are loaded as a preset
+// category to feed the AI brief's newsCategories (src/app/data-loader.ts) —
+// the same role they play on the energy variant. The chip headlines users
+// actually read come from the `semiconductors` panel below.
 // The adjacent categories that variant reuses (hardware / ai / critical-minerals /
 // security / policy / layoffs) are deliberately NOT redefined here: they already
 // exist in TECH_FEEDS / COMMODITY_FEEDS / FULL_FEEDS, and re-declaring them would

@@ -37,22 +37,26 @@ function capture() {
   };
 }
 
-// Minimal stand-in for the projected shapes each section requests.
+// Stand-ins for what each projection yields — i.e. the shape AFTER the server
+// applies the section's `jmespath`, which is what the transport hands back.
+// Kept in step with the expressions in scripts/daily-brief.mjs, which are in
+// turn written against the tools' outputSchema in api/mcp/registry/.
 const FIXTURES = {
-  get_world_brief: { headline: 'Quiet week', summary: 'Nothing escalating.' },
+  get_world_brief: { brief: 'Nothing escalating.', summary: null, headlines: ['Quiet week'] },
   get_market_data: [
     { symbol: 'NVDA', price: 1234.5, change: 2.345 },
-    { symbol: 'TSM', price: 210.25, change: -1.5 },
-    { symbol: 'ASML', price: 990, change: 0.1 },
+    // 0.5 is half a percent, not 50% — the regression this fixture pins.
+    { symbol: 'TSM', price: 210.25, change: 0.5 },
+    { symbol: 'ASML', price: 990, change: -0.25 },
   ],
-  get_conflict_events: [{ date: '2026-07-24', country: 'SD', type: 'Battle', fatalities: 12 }],
-  get_cyber_threats: [{ severity: 8, type: 'ransomware', target: 'DE' }],
-  get_natural_disasters: [{ type: 'earthquake', place: 'Off Honshu', magnitude: 5.8 }],
-  get_news_intelligence: [{ title: 'Fab | expansion', source: 'Reuters', url: 'https://example.com/a' }],
-  get_sanctions_data: [{ name: 'Acme LLC', program: 'EO 14114', country: 'RU', date: '2026-07-01' }],
-  get_forecast_predictions: [{ scenario: 'Strait closure', probability: 0.12, domain: 'maritime', horizon: '90d' }],
-  get_country_brief: { headline: 'TW steady', summary: 'Fab output normal.' },
-  get_country_risk: { score: 42, band: 'elevated', trend: 'stable' },
+  get_conflict_events: [{ date: 1769212800000, country: 'SD', type: 'state-based', deaths: 12 }],
+  get_cyber_threats: [{ severity: 'high', type: 'ransomware', country: 'DE', indicator: 'evil.example' }],
+  get_natural_disasters: [{ place: 'Off Honshu', magnitude: 5.8, depthKm: 40, at: 1769212800000 }],
+  get_news_intelligence: [{ title: 'Fab | expansion', source: 'Reuters', url: 'https://example.com/a', threat: 'low', alert: false }],
+  get_sanctions_data: [{ name: 'Acme LLC', country: 'RU', type: 'entity' }],
+  get_forecast_predictions: [{ title: 'Strait closure', probability: 0.12, domain: 'maritime', region: 'MENA' }],
+  get_country_brief: { brief: 'Fab output normal.', framework: 'default' },
+  get_country_risk: { cii: 42, components: { unrest: 30, conflict: 12 } },
 };
 
 const okCall = async (_config, tool) => {
@@ -172,15 +176,34 @@ describe('daily-brief rendering', () => {
 
     assert.match(md, /^# World Monitor Daily Brief/);
     assert.match(md, /_Generated 2026-07-25T06:00:00Z · sections: world, markets · countries: TW_/);
-    assert.match(md, /\*\*Quiet week\*\*/);
+    assert.match(md, /- Quiet week/);
+    assert.match(md, /Nothing escalating\./);
     assert.match(md, /\| Symbol \| Price \| Change % \|/);
     assert.match(md, /\| NVDA \| 1234\.5 \| \+2\.35% \|/);
-    assert.match(md, /\| TSM \| 210\.25 \| -1\.5% \|/);
     // --limit 2 must cut the third quote.
     assert.doesNotMatch(md, /ASML/);
     assert.match(md, /## Country Watch/);
     assert.match(md, /### TW/);
-    assert.match(md, /score \*\*42\*\* · band \*\*elevated\*\* · trend \*\*stable\*\*/);
+    assert.match(md, /CII \*\*42\*\*\/100/);
+    assert.match(md, /unrest 30/);
+  });
+
+  it('keeps market changes in percentage points and probabilities as fractions', async () => {
+    const config = resolveConfig({ sections: 'markets,forecasts' }, KEY_ENV);
+    const md = renderMarkdown(await collect(config, okCall), config, FIXED_NOW);
+
+    // The bug this pins: inferring the unit from magnitude rendered 0.5 as +50%.
+    assert.match(md, /\| TSM \| 210\.25 \| \+0\.5% \|/);
+    assert.doesNotMatch(md, /\+50%/);
+    assert.match(md, /\| ASML \| 990 \| -0\.25% \|/);
+    // Probabilities are 0..1 and DO scale.
+    assert.match(md, /\| Strait closure \| 12% \|/);
+  });
+
+  it('renders epoch timestamps as dates', async () => {
+    const config = resolveConfig({ sections: 'conflicts' }, KEY_ENV);
+    const md = renderMarkdown(await collect(config, okCall), config, FIXED_NOW);
+    assert.match(md, /\| 2026-01-24 \| SD \| state-based \| 12 \|/);
   });
 
   it('renders a failed section as an inline notice and a trailer', async () => {
@@ -197,16 +220,36 @@ describe('daily-brief rendering', () => {
   it('escapes pipes so a cell cannot split a markdown column', async () => {
     const config = resolveConfig({ sections: 'news' }, KEY_ENV);
     const md = renderMarkdown(await collect(config, okCall), config, FIXED_NOW);
-    // The news renderer emits links, so assert the table escape via a table section.
-    assert.match(md, /\[Fab \| expansion\]\(https:\/\/example\.com\/a\)/);
+    assert.match(md, /\[Fab \\\| expansion\]\(https:\/\/example\.com\/a\)/);
   });
 
-  it('renders empty sections without throwing', async () => {
+  it('fails a section whose projection returns null instead of printing an empty table', async () => {
+    // A null projection means the expression did not match the response shape.
+    // Rendering it as "No rows" would ship a confident, empty brief.
     const config = resolveConfig({ sections: 'markets,world' }, KEY_ENV);
     const results = await collect(config, async () => null);
+    assert.deepEqual(results.map((r) => r.ok), [false, false]);
+    for (const result of results) {
+      assert.match(result.error, /projection returned null/);
+      assert.match(result.error, /response shape does not match/);
+    }
     const md = renderMarkdown(results, config, FIXED_NOW);
-    assert.match(md, /_No rows\._/);
-    assert.match(md, /_No brief text returned\._/);
+    assert.doesNotMatch(md, /_No rows\._/);
+    assert.match(md, /_2 of 2 section\(s\) failed/);
+  });
+
+  it('still renders an empty list as "No rows" when the tool genuinely has none', async () => {
+    const config = resolveConfig({ sections: 'markets' }, KEY_ENV);
+    const results = await collect(config, async () => []);
+    assert.equal(results[0].ok, true);
+    assert.match(renderMarkdown(results, config, FIXED_NOW), /_No rows\._/);
+  });
+
+  it('fails a section whose projection returns the wrong container type', async () => {
+    const config = resolveConfig({ sections: 'world' }, KEY_ENV);
+    const results = await collect(config, async () => ['unexpected', 'array']);
+    assert.equal(results[0].ok, false);
+    assert.match(results[0].error, /expected an object, got array/);
   });
 
   it('emits machine-readable json carrying per-section status', async () => {

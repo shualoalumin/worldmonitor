@@ -36,7 +36,7 @@ import diplomacyKeywordsData from '../../../../shared/diplomacy-keywords.json';
 
 const RSS_ACCEPT = 'application/rss+xml, application/xml, text/xml, */*';
 
-const VALID_VARIANTS = new Set(['full', 'tech', 'finance', 'happy', 'commodity']);
+const VALID_VARIANTS = new Set(['full', 'tech', 'finance', 'happy', 'commodity', 'semi']);
 const fallbackDigestCache = new Map<string, { data: ListFeedDigestResponse; ts: number }>();
 const ITEMS_PER_FEED = 5;
 const MAX_ITEMS_PER_CATEGORY = 20;

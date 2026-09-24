@@ -458,6 +458,48 @@ export const VARIANT_FEEDS: Record<string, Record<string, ServerFeed[]>> = {
     ],
   },
 
+  // Semi variant — semi.worldmonitor.app.
+  // Feed NAMES must match src/config/feeds.ts SEMI_FEEDS exactly: the client
+  // filters digest items against its own feed-name set (data-loader.ts), and
+  // the server truncates to MAX_ITEMS_PER_CATEGORY before that filter runs, so
+  // a name that differs on one side is not just invisible — it crowds out
+  // items the user would have seen. tests/news-feed-key-parity.test.mts locks
+  // the category keys; the names are checked by review.
+  semi: {
+    'live-news': [
+      { name: 'Reuters Semiconductors', url: gn('site:reuters.com (semiconductor OR chipmaker OR TSMC OR ASML OR Nvidia OR "chip industry") when:1d') },
+      { name: 'Bloomberg Chips', url: gn('site:bloomberg.com (semiconductor OR chip OR TSMC OR Samsung foundry) when:1d') },
+      { name: 'Nikkei Asia Tech', url: gn('site:asia.nikkei.com (semiconductor OR chip OR TSMC OR foundry) when:2d') },
+      { name: 'DigiTimes', url: gn('site:digitimes.com (semiconductor OR foundry OR wafer OR packaging) when:2d') },
+      { name: 'Tom’s Hardware', url: 'https://www.tomshardware.com/feeds/all' },
+    ],
+    semiconductors: [
+      { name: 'AnandTech / Chip Design', url: gn('("chip design" OR "process node" OR "2nm" OR "3nm" OR EUV OR "High-NA") when:2d') },
+      { name: 'Foundry & Nodes', url: gn('(TSMC OR "Samsung Foundry" OR "Intel Foundry" OR GlobalFoundries OR SMIC OR "Rapidus") when:1d') },
+      { name: 'Memory & Storage', url: gn('(DRAM OR NAND OR HBM OR "SK Hynix" OR Micron OR "memory prices") when:1d') },
+      { name: 'Equipment Makers', url: gn('(ASML OR "Applied Materials" OR "Lam Research" OR "Tokyo Electron" OR KLA OR "lithography") when:2d') },
+      { name: 'EE Times', url: gn('site:eetimes.com when:3d') },
+    ],
+    'fab-capex': [
+      { name: 'Fab Construction', url: gn('("new fab" OR "fab construction" OR "chip plant" OR "wafer fab" OR "fab expansion") when:3d') },
+      { name: 'Capex & Guidance', url: gn('("semiconductor capex" OR "chip capex" OR "capital spending" semiconductor) when:3d') },
+      { name: 'Chip Subsidies', url: gn('("CHIPS Act" OR "chip subsidy" OR "EU Chips Act" OR "semiconductor grant" OR "fab incentive") when:3d') },
+      { name: 'Packaging & Test Capacity', url: gn('("advanced packaging" OR CoWoS OR "OSAT" OR "chip packaging capacity") when:3d') },
+    ],
+    'export-controls': [
+      { name: 'Export Controls', url: gn('("export controls" OR "entity list" OR "BIS rule" OR "chip export" OR "technology transfer") when:2d') },
+      { name: 'Chip Sanctions', url: gn('("chip sanctions" OR "semiconductor sanctions" OR "chip smuggling" OR "GPU export") when:2d') },
+      { name: 'Tariffs & Trade Rules', url: gn('("semiconductor tariff" OR "chip tariff" OR "Section 232" semiconductor OR "trade rule" chips) when:3d') },
+      { name: 'Taiwan & Korea Policy', url: gn('("Taiwan chip" OR "Korea chip policy" OR "Japan semiconductor policy" OR "chip alliance") when:3d') },
+    ],
+    'chip-materials': [
+      { name: 'Wafers & Substrates', url: gn('("silicon wafer" OR "ABF substrate" OR "IC substrate" OR "photoresist" OR "wafer supply") when:3d') },
+      { name: 'Critical Chip Inputs', url: gn('(gallium OR germanium OR "rare earth" OR "neon gas" OR "high-purity quartz") export OR supply when:3d') },
+      { name: 'HBM & Advanced Memory', url: gn('(HBM OR "HBM3E" OR "HBM4" OR "memory supply deal") when:2d') },
+      { name: 'Chip Logistics', url: gn('("chip shortage" OR "semiconductor supply chain" OR "component lead time" OR "electronics logistics") when:2d') },
+    ],
+  },
+
   happy: {
     positive: [
       { name: 'Good News Network', url: 'https://www.goodnewsnetwork.org/feed/' },

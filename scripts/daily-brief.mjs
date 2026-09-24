@@ -52,21 +52,36 @@ const DEFAULT_SECTIONS = ['world', 'markets', 'conflicts', 'cyber', 'disasters']
 
 class UsageError extends Error {}
 
-// Section id → { title, tool, args(ctx), render(data) }.
+// Section id → { title, tool, args(ctx), render(rows) }.
 //
-// `jmespath` projections are part of the request, not a post-processing step:
-// the server applies them, so the wire payload is already the shape `render`
-// expects. Keep a projection and its renderer in sync — a projection that
-// drops a field the renderer reads shows up as an empty cell, not an error.
+// PROJECTIONS ARE PART OF THE REQUEST: the server applies `jmespath` before the
+// response crosses the wire, so `render` receives the projected shape directly.
+// Each one is written against the tool's declared `outputSchema` in
+// api/mcp/registry/{cache,rpc}-tools.ts — the source of truth. Two shapes exist:
+//
+//   • cache tools wrap everything in `cacheEnvelope` → { cached_at, stale, data }
+//     so every projection starts at `data.<bucket>`, and the bucket names are
+//     cache keys (`"ucdp-events"`, `"threats-bootstrap"`), not tidy plurals.
+//   • rpc tools (the LLM briefs, country risk) return their fields at the root.
+//
+// Getting this wrong is silent by nature — JMESPath answers `null` for a path
+// that does not exist, which is indistinguishable from "no data" unless the
+// caller checks. `collect` treats a null projection on a section that declares
+// `expects` as a failure for exactly that reason; see the note there.
 const SECTIONS = {
   world: {
     title: 'Global Situation',
     tool: 'get_world_brief',
-    args: () => ({ jmespath: '{summary: summary, headline: headline, updated: updated_at}' }),
+    // rpc tool: root-level fields. `brief` is the LLM text; `summary` is the
+    // alternate name some upstream variants use, so take whichever is present.
+    args: () => ({ jmespath: '{brief: brief, summary: summary, headlines: headlines}' }),
+    expects: 'object',
     render: (data) => {
       const lines = [];
-      if (data?.headline) lines.push(`**${data.headline}**`, '');
-      if (data?.summary) lines.push(String(data.summary).trim());
+      const headlines = Array.isArray(data?.headlines) ? data.headlines.filter(Boolean) : [];
+      if (headlines.length) lines.push(...headlines.map((h) => `- ${cell(h)}`), '');
+      const text = data?.brief || data?.summary;
+      if (text) lines.push(String(text).trim());
       return lines.length ? lines.join('\n') : '_No brief text returned._';
     },
   },
@@ -74,9 +89,10 @@ const SECTIONS = {
     title: 'Markets',
     tool: 'get_market_data',
     args: () => ({ jmespath: 'data."stocks-bootstrap".quotes[].{symbol: symbol, price: price, change: changePercent}' }),
-    render: (data, ctx) => table(
+    expects: 'array',
+    render: (rows) => table(
       ['Symbol', 'Price', 'Change %'],
-      asRows(data, ctx.limit).map((q) => [q.symbol, fmtNum(q.price), fmtPct(q.change)]),
+      rows.map((q) => [q.symbol, fmtNum(q.price), fmtChangePct(q.change)]),
     ),
   },
   conflicts: {
@@ -85,11 +101,12 @@ const SECTIONS = {
     args: (ctx) => ({
       limit: ctx.limit,
       ...(ctx.countries.length === 1 ? { country: ctx.countries[0] } : {}),
-      jmespath: 'events[].{date: event_date, country: country, type: event_type, fatalities: fatalities, note: notes}',
+      jmespath: 'data."ucdp-events".events[].{date: dateStart, country: country, type: violenceType, deaths: deathsBest}',
     }),
-    render: (data, ctx) => table(
-      ['Date', 'Country', 'Type', 'Fatalities'],
-      asRows(data, ctx.limit).map((e) => [e.date, e.country, e.type, fmtNum(e.fatalities)]),
+    expects: 'array',
+    render: (rows) => table(
+      ['Date', 'Country', 'Violence type', 'Deaths'],
+      rows.map((e) => [fmtDate(e.date), e.country, e.type, fmtNum(e.deaths)]),
     ),
   },
   cyber: {
@@ -97,11 +114,13 @@ const SECTIONS = {
     tool: 'get_cyber_threats',
     args: (ctx) => ({
       limit: ctx.limit,
-      jmespath: 'threats[].{severity: severity, type: threat_type, target: target_country, summary: summary}',
+      jmespath: 'data."threats-bootstrap".threats[].{severity: severity, type: type, country: country, indicator: indicator}',
     }),
-    render: (data, ctx) => table(
-      ['Severity', 'Type', 'Target'],
-      asRows(data, ctx.limit).map((t) => [fmtNum(t.severity), t.type, t.target]),
+    expects: 'array',
+    // `severity` is a string in this schema (not a score) — render it verbatim.
+    render: (rows) => table(
+      ['Severity', 'Type', 'Country', 'Indicator'],
+      rows.map((t) => [t.severity, t.type, t.country, t.indicator]),
     ),
   },
   disasters: {
@@ -109,11 +128,12 @@ const SECTIONS = {
     tool: 'get_natural_disasters',
     args: (ctx) => ({
       limit: ctx.limit,
-      jmespath: 'events[].{type: type, place: place, magnitude: magnitude, time: time}',
+      jmespath: 'data.earthquakes.earthquakes[].{place: place, magnitude: magnitude, depthKm: depthKm, at: occurredAt}',
     }),
-    render: (data, ctx) => table(
-      ['Type', 'Place', 'Magnitude'],
-      asRows(data, ctx.limit).map((e) => [e.type, e.place, fmtNum(e.magnitude)]),
+    expects: 'array',
+    render: (rows) => table(
+      ['Place', 'Magnitude', 'Depth (km)', 'When'],
+      rows.map((e) => [e.place, fmtNum(e.magnitude), fmtNum(e.depthKm), fmtDate(e.at)]),
     ),
   },
   news: {
@@ -121,10 +141,15 @@ const SECTIONS = {
     tool: 'get_news_intelligence',
     args: (ctx) => ({
       limit: ctx.limit,
-      jmespath: 'items[].{title: title, source: source, category: category, url: url}',
+      jmespath: 'data.insights.topStories[].{title: primaryTitle, source: primarySource, url: primaryLink, threat: threatLevel, alert: isAlert}',
     }),
-    render: (data, ctx) => asRows(data, ctx.limit)
-      .map((n) => `- ${n.url ? `[${n.title}](${n.url})` : n.title}${n.source ? ` — ${n.source}` : ''}`)
+    expects: 'array',
+    render: (rows) => rows
+      .map((n) => {
+        const title = n.url ? `[${cell(n.title)}](${n.url})` : cell(n.title);
+        const tags = [n.source, n.threat, n.alert ? 'ALERT' : null].filter(Boolean).join(' · ');
+        return `- ${title}${tags ? ` — ${tags}` : ''}`;
+      })
       .join('\n') || '_No items._',
   },
   sanctions: {
@@ -133,11 +158,13 @@ const SECTIONS = {
     args: (ctx) => ({
       limit: ctx.limit,
       ...(ctx.countries.length === 1 ? { country: ctx.countries[0] } : {}),
-      jmespath: 'designations[].{name: name, program: program, date: listed_on, country: country}',
+      // `entities` is a bare array on the envelope, not an object with a list.
+      jmespath: 'data.entities[].{name: name, country: cc, type: et}',
     }),
-    render: (data, ctx) => table(
-      ['Name', 'Program', 'Country', 'Listed'],
-      asRows(data, ctx.limit).map((d) => [d.name, d.program, d.country, d.date]),
+    expects: 'array',
+    render: (rows) => table(
+      ['Name', 'Country', 'Entity type'],
+      rows.map((d) => [d.name, d.country, d.type]),
     ),
   },
   forecasts: {
@@ -145,11 +172,12 @@ const SECTIONS = {
     tool: 'get_forecast_predictions',
     args: (ctx) => ({
       limit: ctx.limit,
-      jmespath: 'forecasts[].{scenario: scenario, probability: probability, domain: domain, horizon: horizon}',
+      jmespath: 'data.predictions.predictions[].{title: title, probability: probability, domain: domain, region: region}',
     }),
-    render: (data, ctx) => table(
-      ['Scenario', 'Probability', 'Domain', 'Horizon'],
-      asRows(data, ctx.limit).map((f) => [f.scenario, fmtPct(f.probability), f.domain, f.horizon]),
+    expects: 'array',
+    render: (rows) => table(
+      ['Scenario', 'Probability', 'Domain', 'Region'],
+      rows.map((f) => [f.title, fmtProbability(f.probability), f.domain, f.region]),
     ),
   },
 };
@@ -158,24 +186,24 @@ const COUNTRY_SECTIONS = {
   brief: {
     title: 'Brief',
     tool: 'get_country_brief',
-    args: (_ctx, code) => ({ country_code: code, jmespath: '{summary: summary, headline: headline}' }),
-    render: (data) => {
-      const lines = [];
-      if (data?.headline) lines.push(`**${data.headline}**`, '');
-      if (data?.summary) lines.push(String(data.summary).trim());
-      return lines.length ? lines.join('\n') : '_No brief text returned._';
-    },
+    args: (_ctx, code) => ({ country_code: code, jmespath: '{brief: brief, framework: framework}' }),
+    expects: 'object',
+    render: (data) => (data?.brief ? String(data.brief).trim() : '_No brief text returned._'),
   },
   risk: {
     title: 'Risk',
     tool: 'get_country_risk',
-    args: (_ctx, code) => ({ country_code: code, jmespath: '{score: score, band: band, trend: trend, updated: updated_at}' }),
+    // CII is the Composite Instability Index (0-100); `components` breaks it
+    // down. There is no band/trend field in this schema.
+    args: (_ctx, code) => ({ country_code: code, jmespath: '{cii: cii, components: components}' }),
+    expects: 'object',
     render: (data) => {
       if (!data || typeof data !== 'object') return '_No score returned._';
       const parts = [];
-      if (data.score != null) parts.push(`score **${fmtNum(data.score)}**`);
-      if (data.band) parts.push(`band **${data.band}**`);
-      if (data.trend) parts.push(`trend **${data.trend}**`);
+      if (data.cii != null) parts.push(`CII **${fmtNum(data.cii)}**/100`);
+      for (const [key, value] of Object.entries(data.components ?? {})) {
+        if (value != null) parts.push(`${key} ${fmtNum(value)}`);
+      }
       return parts.length ? parts.join(' · ') : '_No score returned._';
     },
   },
@@ -183,9 +211,9 @@ const COUNTRY_SECTIONS = {
 
 // ─── formatting helpers ──────────────────────────────────────────────────────
 
-// A projected list section can come back as a bare array or as a single object
-// wrapping one (JMESPath multi-select on an empty source yields null). Normalize
-// to an array so every renderer can assume rows.
+// A projected list section may legitimately come back as a single object when
+// the source held exactly one row. Normalize to an array so renderers can
+// assume rows. `null` never reaches here — `collect` fails the section first.
 function asRows(data, limit) {
   const rows = Array.isArray(data) ? data : data && typeof data === 'object' ? [data] : [];
   return rows.filter(Boolean).slice(0, limit);
@@ -197,13 +225,36 @@ function fmtNum(value) {
   return Number.isFinite(n) ? String(Math.round(n * 100) / 100) : String(value);
 }
 
-function fmtPct(value) {
+// Market moves arrive ALREADY in percentage points (`changePercent: 0.5` means
+// half a percent). Never infer the unit from magnitude — that reads 0.5 as a
+// probability and prints +50%.
+function fmtChangePct(value) {
   if (value == null || value === '') return '—';
   const n = Number(value);
   if (!Number.isFinite(n)) return String(value);
-  // Probabilities arrive as 0..1, percent changes as ±n — scale only the former.
-  const pct = Math.abs(n) <= 1 ? n * 100 : n;
-  return `${pct > 0 ? '+' : ''}${Math.round(pct * 100) / 100}%`;
+  return `${n > 0 ? '+' : ''}${Math.round(n * 100) / 100}%`;
+}
+
+// Forecast probabilities arrive as a 0..1 fraction.
+function fmtProbability(value) {
+  if (value == null || value === '') return '—';
+  const n = Number(value);
+  if (!Number.isFinite(n)) return String(value);
+  return `${Math.round(n * 10000) / 100}%`;
+}
+
+// Timestamps are epoch millis, epoch seconds, or an ISO string depending on the
+// upstream; render the date part when it parses and fall back to the raw value.
+function fmtDate(value) {
+  if (value == null || value === '') return '—';
+  let date;
+  if (typeof value === 'number' || /^\d+$/.test(String(value))) {
+    const n = Number(value);
+    date = new Date(n < 1e11 ? n * 1000 : n);
+  } else {
+    date = new Date(String(value));
+  }
+  return Number.isNaN(date.getTime()) ? String(value) : date.toISOString().slice(0, 10);
 }
 
 // Pipes inside a cell would split the column; escape them rather than dropping
@@ -373,13 +424,38 @@ export function resolveConfig(options, env = {}) {
 // Collects one result per requested section (plus two per country). Each entry
 // carries either `data` or `error` — never both — so the renderers below can
 // stay total, and `ok: false` on any entry drives the exit code.
+// A projection that does not match the tool's real response shape returns
+// `null`, which is indistinguishable from "the tool had no data" once it
+// reaches a renderer — the brief would quietly print "No rows" and exit 0.
+// Since the brief's whole job is carrying data, a shape mismatch has to be
+// loud: sections declare what they `expects`, and anything else fails the
+// section (and therefore the exit code) with the projection named.
+function coerceSectionData(section, data, ctx) {
+  if (data == null) {
+    throw new Error(`${section.tool}: projection returned null — response shape does not match \`${section.args(ctx).jmespath}\``);
+  }
+  if (section.expects === 'array') {
+    if (!Array.isArray(data) && typeof data !== 'object') {
+      throw new Error(`${section.tool}: expected a list, got ${typeof data}`);
+    }
+    return asRows(data, ctx.limit);
+  }
+  if (typeof data !== 'object' || Array.isArray(data)) {
+    throw new Error(`${section.tool}: expected an object, got ${Array.isArray(data) ? 'array' : typeof data}`);
+  }
+  return data;
+}
+
+// Collects one result per requested section (plus two per country). Each entry
+// carries either `data` or `error` — never both — so the renderers below can
+// stay total, and `ok: false` on any entry drives the exit code.
 export async function collect(config, call) {
   const results = [];
   for (const id of config.sections) {
     const section = SECTIONS[id];
     try {
-      const data = await call(config, section.tool, section.args(config));
-      results.push({ id, title: section.title, ok: true, data });
+      const raw = await call(config, section.tool, section.args(config));
+      results.push({ id, title: section.title, ok: true, data: coerceSectionData(section, raw, config) });
     } catch (error) {
       results.push({ id, title: section.title, ok: false, error: error.message });
     }
@@ -387,11 +463,12 @@ export async function collect(config, call) {
   for (const code of config.countries) {
     for (const [key, section] of Object.entries(COUNTRY_SECTIONS)) {
       const id = `${code}:${key}`;
+      const base = { id, country: code, kind: key, title: `${code} — ${section.title}` };
       try {
-        const data = await call(config, section.tool, section.args(config, code));
-        results.push({ id, country: code, kind: key, title: `${code} — ${section.title}`, ok: true, data });
+        const raw = await call(config, section.tool, section.args(config, code));
+        results.push({ ...base, ok: true, data: coerceSectionData(section, raw, config) });
       } catch (error) {
-        results.push({ id, country: code, kind: key, title: `${code} — ${section.title}`, ok: false, error: error.message });
+        results.push({ ...base, ok: false, error: error.message });
       }
     }
   }
