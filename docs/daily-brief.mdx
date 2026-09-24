@@ -1,0 +1,120 @@
+---
+title: "Daily Brief Automation"
+description: "Generate a recurring World Monitor intelligence brief with scripts/daily-brief.mjs — locally via cron or on a schedule in GitHub Actions."
+---
+
+`scripts/daily-brief.mjs` composes several MCP tool calls into one Markdown (or
+JSON) document: a global situation brief, market tape, conflict events, cyber
+indicators, disasters, and an optional per-country block. It is dependency-free
+and runs on Node 18+.
+
+The CLI (`npx worldmonitor <command>`) is one call per invocation and prints raw
+JSON. This script is the other shape — several tools under one auth and timeout
+budget, projected down to the fields a human reads, rendered as one document.
+
+## Quick start
+
+```bash
+export WORLDMONITOR_API_KEY=wm_xxxxxxxx   # https://worldmonitor.app/pro
+node scripts/daily-brief.mjs
+```
+
+```bash
+# Chip-supply watch list, two sections, written to a file
+node scripts/daily-brief.mjs \
+  --sections world,markets \
+  --countries TW,KR,CN \
+  --out brief.md
+
+# Everything, as JSON, for downstream processing
+node scripts/daily-brief.mjs --sections all --format json --out brief.json
+```
+
+## Options
+
+| Flag | Default | Notes |
+|---|---|---|
+| `--api-key <key>` | `$WORLDMONITOR_API_KEY` | Required. MCP `tools/call` is not reachable on the free tier. |
+| `--mcp-url <url>` | `$WORLDMONITOR_MCP_URL` or `https://worldmonitor.app/mcp` | |
+| `--sections <list>` | `world,markets,conflicts,cyber,disasters` | Or `all`. Available: `world`, `markets`, `conflicts`, `cyber`, `disasters`, `news`, `sanctions`, `forecasts`. |
+| `--countries <list>` | none | ISO 3166-1 alpha-2. Adds a brief + risk score per country. |
+| `--format md\|json` | `md` | |
+| `--out <path>` | stdout | |
+| `--limit <n>` | `5` | Max rows per list section. |
+| `--timeout <ms>` | `30000` | Per request, covering body read. |
+
+`--countries` also narrows the country-filterable sections (`conflicts`,
+`sanctions`) when exactly one country is given; with several it leaves them
+global, since those tools take a single country filter.
+
+### Exit codes
+
+| Code | Meaning |
+|---|---|
+| `0` | Every section returned data. |
+| `1` | One or more sections failed. The brief is still produced, with an inline `> **Unavailable**` notice per failed section and a trailer listing them. |
+| `2` | Usage error (bad flag, unknown section, missing key). No API calls were made. |
+
+Sections are independent on purpose: a partial brief beats no brief when a single
+upstream is down, and the non-zero exit still lets a scheduler alert on it.
+
+### Payload size
+
+Every section sends a `jmespath` argument, so the server projects the response
+before it crosses the wire — typically 80–95% smaller than the raw bundle. On the
+Pro tier each call also consumes daily quota, so the section list is worth
+trimming to what you actually read. See the
+[JMESPath guide](/mcp-jmespath) for the projection syntax.
+
+## Running it on a schedule
+
+### GitHub Actions
+
+`.github/workflows/daily-brief.yml` runs the script at 06:00 UTC on weekdays —
+after the Asian close, before the European open — and keeps each brief as a
+workflow artifact for 30 days. It also renders into the run summary, so a brief
+is readable in the Actions UI without downloading anything.
+
+Set `WORLDMONITOR_API_KEY` under **Settings → Secrets and variables → Actions**.
+Without the secret the generate job is skipped rather than failed, so a fork does
+not show a permanently red schedule.
+
+`workflow_dispatch` takes `sections` and `countries` inputs for one-off runs from
+the Actions UI.
+
+The brief is deliberately **not** committed back to the repository: it is a dated
+snapshot of live upstreams, so a commit per day would be history noise, and a push
+from a scheduled workflow re-triggers other workflows.
+
+### cron
+
+```cron
+# 06:00 UTC weekdays, appended to a dated file
+0 6 * * 1-5 cd /path/to/worldmonitor && WORLDMONITOR_API_KEY=wm_xxx \
+  /usr/bin/node scripts/daily-brief.mjs --out "briefs/$(date -u +\%Y-\%m-\%d).md"
+```
+
+Note the escaped `%` — cron treats a bare `%` as a newline. For mail delivery,
+drop `--out` and let cron mail stdout:
+
+```cron
+MAILTO=you@example.com
+0 6 * * 1-5 cd /path/to/worldmonitor && WORLDMONITOR_API_KEY=wm_xxx /usr/bin/node scripts/daily-brief.mjs
+```
+
+Environment defaults exist for schedulers that prefer env over flags:
+`WORLDMONITOR_BRIEF_SECTIONS`, `WORLDMONITOR_BRIEF_COUNTRIES`,
+`WORLDMONITOR_BRIEF_OUT`.
+
+## Adding a section
+
+Sections are declared in one table in the script — `SECTIONS[id]` with a `title`,
+the `tool` to call, an `args(ctx)` function (which must include a `jmespath`
+projection), and a `render(data, ctx)` function. Keep the projection and the
+renderer in sync: a projection that drops a field the renderer reads shows up as
+an empty cell, not an error.
+
+`tests/daily-brief.test.mjs` covers the composition offline with an injected
+transport — argument validation, per-section failure isolation, the exit-code
+contract, rendering, and an assertion that every section sends a projection. Live
+production coverage lives in `.github/workflows/mcp-live-smoke.yml`.

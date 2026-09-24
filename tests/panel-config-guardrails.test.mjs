@@ -9,7 +9,7 @@ const panelLayoutSrc = readFileSync(resolve(__dirname, '../src/app/panel-layout.
 const panelsSrc = readFileSync(resolve(__dirname, '../src/config/panels.ts'), 'utf-8');
 const commandsSrc = readFileSync(resolve(__dirname, '../src/config/commands.ts'), 'utf-8');
 
-const VARIANT_FILES = ['full', 'tech', 'finance', 'commodity', 'energy', 'happy'];
+const VARIANT_FILES = ['full', 'tech', 'finance', 'commodity', 'energy', 'semi', 'happy'];
 const PANEL_WIDE_CLASS_RE = /className:\s*['"][^'"]*\bpanel-wide\b/;
 const COMPONENT_SOURCE_RE = /\.tsx?$/;
 

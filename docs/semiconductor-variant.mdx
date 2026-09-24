@@ -1,0 +1,137 @@
+---
+title: "Semiconductor Variant (semi)"
+description: "How the semi.worldmonitor.app variant is wired — panels, feeds, map layers, deployment routing — and how to run or extend it."
+---
+
+The `semi` variant is a semiconductor and chip-supply-chain view of World Monitor:
+fabs and capex, advanced packaging, critical chip materials, export controls, and
+the logistics that move wafers and equipment. It is built from the same codebase as
+every other variant (`full`, `tech`, `finance`, `commodity`, `energy`, `happy`).
+
+## Running it
+
+```bash
+npm run dev:semi      # localhost dev server with VITE_VARIANT=semi
+npm run build:semi    # standalone production build of just this variant
+npm run test:e2e:semi # Playwright suite against the semi build
+```
+
+On `localhost` and in the desktop app the variant also resolves from
+`localStorage['worldmonitor-variant'] = 'semi'`, the same switch the other
+variants use.
+
+## What the variant is made of
+
+| Surface | Where |
+|---|---|
+| Panel preset, map layers, mobile layers | `src/config/panels.ts` — `SEMI_PANELS`, `SEMI_MAP_LAYERS`, `SEMI_MOBILE_MAP_LAYERS` |
+| Canonical reference copy | `src/config/variants/semi.ts` (documentation only — runtime reads `panels.ts`) |
+| News sources | `src/config/feeds.ts` — `SEMI_FEEDS` |
+| Layer picker order | `src/config/map-layer-definitions.ts` — `VARIANT_LAYER_ORDER.semi` |
+| SVG/mobile map toggles | `src/components/Map.ts` — `semiLayers` |
+| SEO / OG metadata | `src/config/variant-meta.ts` — `VARIANT_META.semi` |
+| CMD+K entries | `src/config/commands.ts` — `panel:semiconductors` and siblings |
+| Hostname resolution | `src/config/variant.ts`, plus the inline bootstrap in `index.html` |
+
+### Panels
+
+Only four panel keys are new — the chip-specific news categories:
+
+- `semiconductors` — foundries, process nodes, memory, equipment makers
+- `fab-capex` — fab construction, capex guidance, subsidies, packaging capacity
+- `export-controls` — export controls, entity list, chip sanctions and tariffs
+- `chip-materials` — wafers, substrates, photoresist, HBM, chip logistics
+
+Every other panel in the preset is reused from the `tech`, `commodity` and `full`
+sets, so the variant adds no new panel components. The four new keys are ordinary
+RSS news panels: `panel-layout.ts` creates them from the `CANONICAL_FEEDS` union
+and takes the label from `PanelConfig.name`, which is why they need no new i18n
+entries in the 25 shipped locales.
+
+### Feeds
+
+`SEMI_FEEDS` defines sources **only** for `live-news` and the four chip-specific
+categories. The adjacent categories the preset reuses (`hardware`, `ai`,
+`critical-minerals`, `security`, `policy`, `layoffs`) are deliberately not
+redeclared: `mergeCanonicalFeeds` unions feed maps by category key, so redefining
+them here would push chip-scoped sources into those categories on every other
+variant too. They resolve through the custom-category path in
+`src/config/feed-resolution.ts` instead.
+
+The server-side news digest (`server/worldmonitor/news/v1/list-feed-digest.ts`)
+has no `semi` bucket, so its `VALID_VARIANTS` check falls back to `full` and the
+chip categories load client-side. This matches how the `energy` variant ships
+today; adding server buckets is the optimization path if the variant gets traffic.
+
+### Map layers
+
+No new layer types were introduced. The variant composes existing ones: fab and
+compute footprint (`datacenters`, `cloudRegions`, `techHQs`, `cables`), materials
+and logistics (`minerals`, `commodityPorts`, `tradeRoutes`, `waterways`, and
+`miningSites`/`processingPlants` available off-by-default), and risk context
+(`sanctions`, `economic`, `outages`, `natural`).
+
+Any layer enabled by default must also appear in `VARIANT_LAYER_ORDER.semi`,
+otherwise it renders with no toggle to turn it off —
+`tests/variant-layer-guardrail.test.mjs` enforces this.
+
+## Deployment wiring
+
+The variant is registered for the shared web deploy exactly like the other
+subdomain variants:
+
+- `src/config/variant-dashboard-html.ts` — `WEB_DASHBOARD_VARIANTS` includes
+  `semi`, so the build emits `dist/dashboard-semi.html` with self-canonicalizing
+  metadata
+- `vercel.json` — `semi.worldmonitor.app/dashboard` rewrites to
+  `/dashboard-semi.html`; the host also joins the `/` welcome rewrite, the `/docs`
+  redirect, and both CSP frame directives
+- `middleware.ts` — `VARIANT_HOST_MAP` and `VARIANT_OG` entries drive the crawler
+  stub
+- `docker/nginx.conf` and `docker/nginx-security-headers.conf` — self-hosted CSP
+  kept byte-identical to the Vercel header
+- `public/favico/semi/` — favicon and OG image set
+
+`tests/deploy-config.test.mjs` cross-checks all of the above against
+`variant-meta.ts`, so a variant that exists in metadata but not in routing fails
+CI.
+
+**The one step outside this repository** is pointing `semi.worldmonitor.app` at
+the Vercel project (DNS record + domain assignment). Until that exists the variant
+is reachable through `npm run dev:semi` / `build:semi` and the desktop variant
+switch, and every code path above is already in place.
+
+### Branding assets
+
+`public/favico/semi/` currently carries copies of the base World Monitor icon set
+so the build resolves real files. Replace them with semi-specific artwork
+(`favicon.ico`, `favicon-16x16.png`, `favicon-32x32.png`, `apple-touch-icon.png`,
+`android-chrome-192x192.png`, `android-chrome-512x512.png`, `og-image.png`) before
+the subdomain goes public — the OG image is what social cards and the crawler stub
+serve.
+
+## Adding a variant of your own
+
+The `semi` variant is a compact worked example. In order:
+
+1. `src/config/panels.ts` — panel preset, map layers, mobile layers, then register
+   in `VARIANT_PANEL_CONFIGS`, `ALL_PANELS`, `VARIANT_DEFAULTS`, the
+   `DEFAULT_MAP_LAYERS` / `MOBILE_DEFAULT_MAP_LAYERS` chains, and
+   `PANEL_CATEGORY_MAP` (reuse existing `labelKey`s to avoid new i18n work)
+2. `src/config/map-layer-definitions.ts` — `MapVariant` union and
+   `VARIANT_LAYER_ORDER`
+3. `src/config/feeds.ts` — feed map, the `FEEDS` selector chain, `CANONICAL_FEEDS`
+4. `src/config/commands.ts` — a `panel:<id>` command for each new panel
+5. `src/config/variant.ts` + `index.html` inline bootstrap — hostname resolution
+6. `src/config/variant-meta.ts` — SEO metadata (this is what pulls the deployment
+   guardrails in)
+7. `vercel.json`, `middleware.ts`, `docker/nginx*.conf`, `WEB_DASHBOARD_VARIANTS`,
+   `public/favico/<variant>/`
+8. `package.json` — `dev:`, `build:`, `test:e2e:` scripts
+9. `tests/panel-config-guardrails.test.mjs` `VARIANT_FILES` and
+   `tests/variant-inline-bootstrap.test.mjs`
+
+Editing `index.html`'s inline bootstrap changes its CSP hash: recompute the
+`sha256-…` entry in `vercel.json`, `docker/nginx.conf` and
+`docker/nginx-security-headers.conf` together, or
+`tests/deploy-config.test.mjs` will fail with the exact expected value.

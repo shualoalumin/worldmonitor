@@ -786,8 +786,8 @@ export class DataLoaderManager implements AppModule {
         tasks.push({ name: 'oil', task: () => runGuarded('oil', () => this.loadOilAnalytics()) });
       }
 
-      // Trade policy + supply-chain data (FULL, FINANCE, COMMODITY, ENERGY variants use supply-chain surface)
-      if (SITE_VARIANT === 'full' || SITE_VARIANT === 'finance' || SITE_VARIANT === 'commodity' || SITE_VARIANT === 'energy') {
+      // Trade policy + supply-chain data (FULL, FINANCE, COMMODITY, ENERGY, SEMI variants use supply-chain surface)
+      if (SITE_VARIANT === 'full' || SITE_VARIANT === 'finance' || SITE_VARIANT === 'commodity' || SITE_VARIANT === 'energy' || SITE_VARIANT === 'semi') {
         if (shouldLoad('trade-policy')) {
           tasks.push({ name: 'tradePolicy', task: () => runGuarded('tradePolicy', () => this.loadTradePolicy()) });
         }
@@ -2104,7 +2104,9 @@ export class DataLoaderManager implements AppModule {
             ? ['commodity-news', 'gold-silver', 'mining-news', 'energy', 'critical-minerals']
             : SITE_VARIANT === 'energy'
               ? ['live-news', 'energy', 'supply-chain']
-              : undefined,
+              : SITE_VARIANT === 'semi'
+                ? ['live-news', 'semiconductors', 'fab-capex', 'export-controls', 'chip-materials']
+                : undefined,
         }),
         60_000,
         'daily-brief-total-build',

@@ -252,6 +252,12 @@ export const COMMANDS: Command[] = [
   { id: 'panel:critical-minerals', keywords: ['critical minerals', 'rare earth', 'lithium', 'cobalt', 'strategic minerals'], label: 'Critical Minerals', icon: '\u{1F48E}', category: 'panels' },
   { id: 'panel:commodity-regulation', keywords: ['commodity regulation', 'mining regulation', 'resource policy'], label: 'Regulation & Policy', icon: '\u{1F4DC}', category: 'panels' },
 
+  // Semi variant panels
+  { id: 'panel:semiconductors', keywords: ['semiconductor news', 'chip news', 'foundry', 'tsmc', 'asml', 'wafer'], label: 'Semiconductor News', icon: '\u{1F9E9}', category: 'panels' },
+  { id: 'panel:fab-capex', keywords: ['fab', 'fab capex', 'chip plant', 'chips act', 'foundry capacity'], label: 'Fabs & Capex', icon: '\u{1F3D7}️', category: 'panels' },
+  { id: 'panel:export-controls', keywords: ['export controls', 'entity list', 'chip sanctions', 'chip tariffs'], label: 'Export Controls & Chip Policy', icon: '\u{1F6AB}', category: 'panels' },
+  { id: 'panel:chip-materials', keywords: ['chip materials', 'wafer', 'substrate', 'hbm', 'photoresist', 'gallium'], label: 'Materials, Substrates & HBM', icon: '\u{1F9EA}', category: 'panels' },
+
   // Positive / happy panels
   { id: 'panel:positive-feed', keywords: ['good news', 'positive news', 'optimistic', 'uplifting'], label: 'Panel: Good News Feed', icon: '\u{1F33F}', category: 'panels' },
   { id: 'panel:breakthroughs', keywords: ['breakthroughs', 'science breakthroughs', 'discoveries'], label: 'Panel: Breakthroughs', icon: '\u{1F9EC}', category: 'panels' },

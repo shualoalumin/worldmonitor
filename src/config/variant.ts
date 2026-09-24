@@ -20,7 +20,7 @@ export const SITE_VARIANT: string = (() => {
   const isTauri = '__TAURI_INTERNALS__' in window || '__TAURI__' in window;
   if (isTauri) {
     const stored = loadStoredVariant();
-    if (stored === 'tech' || stored === 'full' || stored === 'finance' || stored === 'happy' || stored === 'commodity' || stored === 'energy') return stored;
+    if (stored === 'tech' || stored === 'full' || stored === 'finance' || stored === 'happy' || stored === 'commodity' || stored === 'energy' || stored === 'semi') return stored;
     return buildVariant;
   }
 
@@ -30,10 +30,11 @@ export const SITE_VARIANT: string = (() => {
   if (h.startsWith('happy.')) return 'happy';
   if (h.startsWith('commodity.')) return 'commodity';
   if (h.startsWith('energy.')) return 'energy';
+  if (h.startsWith('semi.')) return 'semi';
 
   if (h === 'localhost' || h === '127.0.0.1') {
     const stored = loadStoredVariant();
-    if (stored === 'tech' || stored === 'full' || stored === 'finance' || stored === 'happy' || stored === 'commodity' || stored === 'energy') return stored;
+    if (stored === 'tech' || stored === 'full' || stored === 'finance' || stored === 'happy' || stored === 'commodity' || stored === 'energy' || stored === 'semi') return stored;
     return buildVariant;
   }
 

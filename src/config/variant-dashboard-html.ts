@@ -5,7 +5,7 @@ import { VARIANT_META, type VariantMeta } from './variant-meta';
 // <variant>.worldmonitor.app/dashboard → /dashboard-<variant>.html).
 // Desktop/self-host variant builds are NOT in scope — they run
 // htmlVariantPlugin at build time with VITE_VARIANT set.
-export const WEB_DASHBOARD_VARIANTS = ['tech', 'finance', 'commodity', 'happy', 'energy'] as const;
+export const WEB_DASHBOARD_VARIANTS = ['tech', 'finance', 'commodity', 'happy', 'energy', 'semi'] as const;
 
 export function variantDashboardFileName(variant: string): string {
   return `dashboard-${variant}.html`;

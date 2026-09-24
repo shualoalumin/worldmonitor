@@ -51,6 +51,8 @@ const VARIANTS: Array<{ clientConst: string; serverKey: string; knownGapsClientO
   },
   { clientConst: 'FINANCE_FEEDS', serverKey: 'finance', knownGapsClientOnly: [] },
   { clientConst: 'COMMODITY_FEEDS', serverKey: 'commodity', knownGapsClientOnly: [] },
+  // semi shipped with a server bucket map from the start — no gaps to allow.
+  { clientConst: 'SEMI_FEEDS', serverKey: 'semi', knownGapsClientOnly: [] },
   // FULL_FEEDS / HAPPY_FEEDS / ENERGY_FEEDS aren't asserted yet —
   // those variants don't have a fully-aligned server bucket map at the
   // time this test was written. Add them as the server catches up.

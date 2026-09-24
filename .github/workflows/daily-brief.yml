@@ -1,0 +1,125 @@
+name: Daily Brief
+
+# Generates a World Monitor daily intelligence brief with
+# scripts/daily-brief.mjs and keeps it as a workflow artifact.
+#
+# WHY A WORKFLOW AND NOT JUST CRON: the same script runs either way (see
+# docs/daily-brief.mdx for the crontab form). Actions adds a scheduler nobody
+# has to host, secret storage for the API key, and a retained artifact per run —
+# so a brief from three weeks ago is still readable without a mailbox.
+#
+# The brief is NOT committed back to the repo: it is a dated snapshot of live
+# upstreams, so a commit per day would be pure history noise, and a push from a
+# scheduled workflow re-triggers other workflows.
+#
+# Triggers:
+#   - schedule (06:00 UTC weekdays): after the Asian close and before the
+#     European open, which is when the overnight picture is complete.
+#   - push to main touching the script/workflow: validates edits on merge by
+#     running the offline test suite (no API key needed, no live calls).
+#   - workflow_dispatch: manual runs, with the section/country list overridable
+#     from the Actions UI.
+#
+# Auth: WORLDMONITOR_API_KEY must be a repository secret (get a key at
+# https://worldmonitor.app/pro). Without it the generate job is skipped rather
+# than failed — a fork or a repo that has not set the secret should not show a
+# permanently red schedule.
+
+on:
+  schedule:
+    - cron: '0 6 * * 1-5'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/daily-brief.mjs'
+      - 'tests/daily-brief.test.mjs'
+      - '.github/workflows/daily-brief.yml'
+  workflow_dispatch:
+    inputs:
+      sections:
+        description: "Sections (comma-separated, or 'all')"
+        required: false
+        default: 'world,markets,conflicts,cyber,disasters'
+      countries:
+        description: 'ISO 3166-1 alpha-2 codes (comma-separated)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: daily-brief-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # Offline composition tests: argument validation, per-section failure
+  # isolation, exit codes, rendering. No network, no API key.
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - run: node --test tests/daily-brief.test.mjs
+
+  generate:
+    needs: test
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+
+      - name: Check for an API key
+        id: auth
+        env:
+          WORLDMONITOR_API_KEY: ${{ secrets.WORLDMONITOR_API_KEY }}
+        run: |
+          if [ -n "$WORLDMONITOR_API_KEY" ]; then
+            echo 'present=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'present=false' >> "$GITHUB_OUTPUT"
+            echo '::notice::WORLDMONITOR_API_KEY secret is not set — skipping brief generation. Add it in Settings → Secrets → Actions.'
+          fi
+
+      # Exit 1 means "some sections were unavailable" and the brief still has
+      # content, so the artifact is uploaded either way; the step records the
+      # degraded run as a warning instead of failing the job. Exit 2 (usage) and
+      # any other code are real failures.
+      - name: Generate brief
+        if: steps.auth.outputs.present == 'true'
+        id: brief
+        env:
+          WORLDMONITOR_API_KEY: ${{ secrets.WORLDMONITOR_API_KEY }}
+          SECTIONS: ${{ github.event.inputs.sections || 'world,markets,conflicts,cyber,disasters' }}
+          COUNTRIES: ${{ github.event.inputs.countries || '' }}
+        run: |
+          set +e
+          node scripts/daily-brief.mjs \
+            --sections "$SECTIONS" \
+            ${COUNTRIES:+--countries "$COUNTRIES"} \
+            --out "brief-$(date -u +%Y-%m-%d).md"
+          status=$?
+          set -e
+          case "$status" in
+            0) echo '::notice::Brief generated with every section available.' ;;
+            1) echo '::warning::Brief generated with one or more sections unavailable — see the artifact trailer.' ;;
+            *) echo "::error::daily-brief.mjs exited $status"; exit "$status" ;;
+          esac
+
+      - name: Summarize in the run log
+        if: steps.auth.outputs.present == 'true'
+        run: cat brief-*.md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: steps.auth.outputs.present == 'true'
+        with:
+          name: daily-brief-${{ github.run_id }}
+          path: brief-*.md
+          retention-days: 30

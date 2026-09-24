@@ -122,6 +122,35 @@ Don't try to memorise the grammar from scratch — head to the [JMESPath guide](
 
 Full per-tool parameters, freshness budgets, and `curl` examples are in the [MCP Tools Reference](/mcp-tools-reference). When the compressed `tools/list` description is ambiguous about a specific tool, call `describe_tool` with `tool_name: "<name>"` for the full uncompressed definition — it's exempt from the Pro daily quota, so use it freely while exploring.
 
+## Scripted setup and verification
+
+If you are cloning this repository, `scripts/mcp-client-setup.mjs` does the two
+mechanical parts of the steps above:
+
+```bash
+# Print the entry for your client: claude-desktop, claude-code, cursor, mcp-remote
+node scripts/mcp-client-setup.mjs --print-config claude-desktop
+
+# Merge it into an existing config — other servers are preserved and a .bak is written
+node scripts/mcp-client-setup.mjs --write ~/.cursor/mcp.json --client cursor
+
+# Walk initialize → tools/list → one authenticated tools/call
+WORLDMONITOR_API_KEY=wm_xxx node scripts/mcp-client-setup.mjs --verify
+```
+
+`--verify` exists because discovery is anonymous by design: `initialize` and
+`tools/list` answer `200` with no credentials, so a wrong or under-tiered key
+looks perfectly healthy until the first `tools/call` returns `401`. The check
+walks past discovery into a real authenticated call and prints a per-step result,
+exiting `1` if any step fails (`2` on a usage error):
+
+```
+verifying https://worldmonitor.app/mcp
+  ok   initialize — worldmonitor-mcp
+  ok   tools/list — 40 tool(s) advertised
+  FAIL tools/call — HTTP 401 — key rejected. Check the key value and that its plan reaches MCP (free tier cannot).
+```
+
 ## Troubleshooting and expectations
 
 If an endpoint appears in the REST OpenAPI docs but does not appear as an MCP tool, that is usually intentional. MCP exposes curated agent-safe tools, not every REST operation. Some REST routes are excluded because they mutate state, invoke per-call LLM work, fetch paid or high-cardinality upstream data on cache miss, or need manual cache-key mapping.
