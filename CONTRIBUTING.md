@@ -40,7 +40,7 @@ World Monitor is a real-time OSINT dashboard built with **Vanilla TypeScript** (
 
 ### Variant System
 
-The codebase produces 6 app variants from the same source, each targeting a different audience or use case:
+The codebase produces 7 app variants from the same source, each targeting a different audience or use case:
 
 | Variant | Command | Focus |
 |---|---|---|
@@ -50,6 +50,7 @@ The codebase produces 6 app variants from the same source, each targeting a diff
 | `commodity` | `npm run dev:commodity` | Commodities, mining, energy markets |
 | `happy` | `npm run dev:happy` | Positive news and constructive signals |
 | `energy` | `npm run dev:energy` | Energy security, chokepoints, oil/gas |
+| `semi` | `npm run dev:semi` | Semiconductors, fabs, chip supply chain, export controls |
 
 Variants share all code but differ in default panels, map layers, and RSS feeds. Variant configs live in `src/config/variants/`.
 
